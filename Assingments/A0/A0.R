@@ -2,7 +2,7 @@
 # Assingment 0 ------------------
 #--------------------------------
 
-# Practice code
+# Practice code 
 
 # Excercise 1: Introduction ----
 # 1.Create a directory for this class and store your script \a0.R"

@@ -2,7 +2,7 @@
 #  Econ 613 - Assignment 1 - Javier Fernandez
 # ------------------------------------------------------
 
-## 0. Preliminaries -----
+## Preliminaries -----
 
 # Libraries
 library(tidyverse)
@@ -12,11 +12,12 @@ library(matlib)
 # Set WD
 setwd("C://Users//javie//OneDrive//Documents//Duke - MAE//Academic//Spring 2021//ECON 613 - Applied Metrics (Micro)//Assingments//A1")
 
+
 # -------------------
 # ----- PART 1 ------
 # -------------------
 
-# Load Data
+## 0. Load Data -----
 dat_student <- read.csv("datstu.csv")
 dat_school <- read.csv("datsss.csv")
 dat_position <- read.csv("datjss.csv")
@@ -355,4 +356,34 @@ abs(res_probit$par/prop_sigma_probit)>1.96
 abs(res_logit$par/prop_sigma_logit)>1.96
 
 
+
 ## 8. Marginal effects -----
+
+#### 8.1. Probit average marginal effects
+Xbeta_probit <- regressors %*% as.matrix(res_probit$par)
+mgl_effects_probit <- pnorm(Xbeta_probit)%*% t(as.matrix(res_probit$par))
+
+mean_mgleff_probit <- colMeans(mgl_effects_probit)
+sd_mgleff_probit <- apply(mgl_effects_probit,2,sd)
+
+#### 8.2. Logit average marginal effects
+Xbeta_logit <- regressors %*% as.matrix(res_logit$par)
+mgl_effects_logit <- (plogis(Xbeta_logit)*(1-plogis(Xbeta_logit)))%*%t(as.matrix(res_logit$par))
+
+mean_mgleff_logit <- colMeans(mgl_effects_logit)
+sd_mgleff_logit <- apply(mgl_effects_logit,2,sd)
+
+## Answers
+
+avg_mgleffects <- cbind(mean_mgleff_probit,sd_mgleff_probit,mean_mgleff_logit,sd_mgleff_logit)
+avg_mgleffects <- avg_mgleffects[-1,]
+colnames(avg_mgleffects) <- c("Probit: Avg Mgl Eff","Probit: SD of Mgl Eff",
+                              "Logit: Avg Mgl Eff","Logit: SD of Mgl Eff") 
+
+rownames(avg_mgleffects) <- c("X1","X2","X3")
+avg_mgleffects # Answer
+
+# The average marginal effects are, in general, larger in the probit model than in the logit model.
+# The same is true for the standard errors. In both models, X1 has the largest marginal effect.
+
+

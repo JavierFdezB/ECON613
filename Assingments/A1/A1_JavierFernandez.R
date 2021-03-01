@@ -128,8 +128,8 @@ program_admitted_location <- program_admitted_location %>%
 
 ## 4. Descriptive Characteristics -----
 
-# Total sample
-program_admitted_location %>%  
+# Total sample + rank choice
+program_admitted_location %>% group_by(Choice_num) %>%  
   summarise(Mean_cutoff=mean(cutoff),
             Stdev_cutoff=sd(cutoff),
             Mean_quality=mean(quality),
@@ -154,6 +154,7 @@ program_admitted_location %>% group_by(Program) %>%
             Stdev_quality=sd(quality),
             Mean_distance=mean(distance,na.rm = TRUE),
             Stdev_distance=sd(distance,na.rm = TRUE))
+
 
 # Differentiated by quantiles (This is to be interpreted as the mean cutoff
 # of the schools quantile x students will go to.)
@@ -359,31 +360,99 @@ abs(res_logit$par/prop_sigma_logit)>1.96
 
 ## 8. Marginal effects -----
 
-#### 8.1. Probit average marginal effects
+## Average Marginal effects
+
+#### Probit average marginal effects
 Xbeta_probit <- regressors %*% as.matrix(res_probit$par)
-mgl_effects_probit <- pnorm(Xbeta_probit)%*% t(as.matrix(res_probit$par))
+mgl_effects_probit <- dnorm(Xbeta_probit)%*% t(as.matrix(res_probit$par))
 
 mean_mgleff_probit <- colMeans(mgl_effects_probit)
-sd_mgleff_probit <- apply(mgl_effects_probit,2,sd)
 
-#### 8.2. Logit average marginal effects
+#### Logit average marginal effects
 Xbeta_logit <- regressors %*% as.matrix(res_logit$par)
 mgl_effects_logit <- (plogis(Xbeta_logit)*(1-plogis(Xbeta_logit)))%*%t(as.matrix(res_logit$par))
 
 mean_mgleff_logit <- colMeans(mgl_effects_logit)
-sd_mgleff_logit <- apply(mgl_effects_logit,2,sd)
+
+## Marginal effects at the mean
+
+#### Probit
+mean_Xbeta_probit <- mean(regressors) %*% t(as.matrix(res_probit$par))
+mgl_eff_mean_probit <- as.numeric(dnorm(mean_Xbeta_probit)*res_probit$par)
+mgl_eff_mean_probit
+
+#### Logit
+mean_Xbeta_logit <- mean(regressors) %*% t(as.matrix(res_logit$par))
+mgl_eff_mean_logit <- as.numeric((plogis(mean_Xbeta_logit)*(1-plogis(mean_Xbeta_logit)))*t(as.matrix(res_logit$par)))
+mgl_eff_mean_logit
+
+## Bootstraping to compute the marginal errors
+
+# Probit and logit model
+
+set.seed(322)     # Setting seed
+iter    = 199     # Number of iterations           
+n_obs = length(X1)  # Number of observations          
+number_var = length(res_probit$par) # Number of parameters (including intercept)  
+
+# To save values
+outs_probit = mat.or.vec(iter,number_var) 
+outs_logit = mat.or.vec(iter,number_var)
+outs_mgleff_probit = mat.or.vec(iter,number_var)
+outs_mgleff_logit = mat.or.vec(iter,number_var)
+
+
+
+for (i in 1:iter){
+  # New sample
+  new_sample = sample(1:n_obs,n_obs,rep=TRUE)
+  dat_sample = as.data.frame(regressors[new_sample,])
+  
+  # Models
+  probit_res = glm(data = dat_sample,Ydum ~ X1 + X2 + X3, family = binomial(link = "probit"))
+  logit_res = glm(data = dat_sample,Ydum ~ X1 + X2 + X3, family = binomial(link = "logit"))
+  
+  # Saving coefficients
+  outs_probit[i,] = coef(probit_res)
+  outs_logit[i,] = coef(logit_res)
+  
+  # Mean marginal effects
+  outs_mgleff_probit[i,] = colMeans(dnorm(Xbeta_probit)%*% t(as.matrix(outs_probit[i,]))) 
+  outs_mgleff_logit[i,] = colMeans((plogis(Xbeta_logit)*(1-plogis(Xbeta_logit)))%*%t(as.matrix(outs_logit[i,])))
+  }
+
+sd_mgleff_probit = apply(outs_mgleff_probit,2,sd)
+sd_mgleff_logit = apply(outs_mgleff_logit,2,sd)
+
+
+
 
 ## Answers
 
-avg_mgleffects <- cbind(mean_mgleff_probit,sd_mgleff_probit,mean_mgleff_logit,sd_mgleff_logit)
-avg_mgleffects <- avg_mgleffects[-1,]
-colnames(avg_mgleffects) <- c("Probit: Avg Mgl Eff","Probit: SD of Mgl Eff",
-                              "Logit: Avg Mgl Eff","Logit: SD of Mgl Eff") 
+mgleffects <- cbind(mean_mgleff_probit,mgl_eff_mean_probit,sd_mgleff_probit,
+                    mean_mgleff_logit,mgl_eff_mean_logit,sd_mgleff_logit)
+mgleffects <- mgleffects[-1,]
+colnames(mgleffects) <- c("Probit: Avg Mgl Eff","Probit: Mgl Eff at Mean",
+                              "Probit: SE of Mgl Eff","Logit: Avg Mgl Eff",
+                              "Logit: Mgl Eff at Mean","Logit: SE of Mgl Eff") 
 
-rownames(avg_mgleffects) <- c("X1","X2","X3")
-avg_mgleffects # Answer
+rownames(mgleffects) <- c("X1","X2","X3")
+mgleffects # Answer
 
-# The average marginal effects are, in general, larger in the probit model than in the logit model.
-# The same is true for the standard errors. In both models, X1 has the largest marginal effect.
-
-
+# 1. Probit model: The average marginal effect for X1 is 0.1438, the only positive one. 
+# This means that a unit change in X1 leads to an increase of 0.1438 percentage points 
+# in the probablity of having Ydum=1. X2 and X3 have lower marginal effects and in the 
+# opposite direction.
+# In the case of the marginal effects at the mean, all the effects are smaller, 
+# indicating that probably this measure is not representative of the data. 
+# Finally, the standard errors of the marginal effects are relatively small for X1 and 
+# X3, but are large for X3. This indicates uncertainty on the estimation of X3. 
+ 
+# 2. Logit model: The average marginal effect for X1 is 0.144, the only positive one. 
+# This means that a unit change in X1 leads to an increase of 0.144 percentage points 
+# in the probablity of having Ydum=1. X2 and X3 have lower marginal effects and in the 
+# opposite direction. These results are similar to those of the probit model.
+# In the case of the marginal effects at the mean, all the effects are smaller, 
+# indicating that probably this measure is not representative of the data. 
+# Finally, the standard errors of the marginal effects are relatively small for X1 and 
+# X3, but are large for X3. This indicates uncertainty on the estimation of X3.  

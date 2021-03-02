@@ -23,7 +23,10 @@ library(tidyverse)
 library(matlib)
 ```
 
+```{r}
 
+
+```
 # ----- PART 1 ------
 
 
